@@ -125,4 +125,47 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
         temp_info_font = ImageFont.truetype(FONT_PATH, info_f_size)
         while info_f_size > 12:
             w = draw.textbbox((0, 0), info_cleaned, font=temp_info_font)[2]
-            if w <= conf
+            if w <= conf["max_w"]:
+                break
+            info_f_size -= 1
+            temp_info_font = ImageFont.truetype(FONT_PATH, info_f_size)
+        
+        # 3. リスト化せず直接1つの文字列として描画
+        draw.text((width - r_margin, info_y_pos), info_cleaned, fill="#000000", font=temp_info_font, anchor="ra")
+    else:
+        # 880と800は通常通り（newline_modeに従い、入りきらない場合は自動改行も行う）
+        wrapped_info = wrap_text(i_txt, font_i, conf["max_w"], draw, newline_mode=conf["newline_mode"])
+        temp_y = info_y_pos
+        for i_line in wrapped_info:
+            draw.text((width - r_margin, temp_y), i_line, fill="#000000", font=font_i, anchor="ra")
+            temp_y += conf["info_line_space"]
+
+    return final_image, conf["filename_format"]
+
+# --- UI ---
+st.set_page_config(page_title="学会バナー一括生成", layout="wide")
+with st.sidebar:
+    st.header("🎨 デザイン設定")
+    accent_color = st.color_picker("テーマカラー", "#1A448E")
+    n_in = st.text_input("回数", "第○○回")
+    t_in = st.text_area("学会名", "日本○○○○学会")
+    i_in = st.text_area("詳細 (日時・場所)", "東京・ウェブ併催／2026.1.30〜2.10")
+    st.divider()
+    slug_input = st.text_input("英語ファイル名用キーワード", "jsm").lower().strip()
+    slug = slug_input.replace(" ", "_")
+
+st.title("🎓 学会バナー 3サイズ一括生成")
+cols = st.columns(3)
+size_list = ["880x550", "1440x300", "800x418"]
+for idx, size_key in enumerate(size_list):
+    with cols[idx]:
+        st.subheader(f"📏 {size_key}")
+        try:
+            img, name_format = generate_banner(size_key, n_in, t_in, i_in, accent_color)
+            st.image(img, use_container_width=True)
+            final_filename = name_format.format(slug=slug)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            st.download_button(label=f"💾 保存: {final_filename}", data=buf.getvalue(), file_name=final_filename, key=f"btn_{size_key}")
+        except Exception as e:
+            st.error(f"実行エラー: {e}")
