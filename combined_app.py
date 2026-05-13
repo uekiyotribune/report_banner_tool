@@ -19,8 +19,9 @@ def wrap_text(text, font, max_width, draw, newline_mode="all", force_single_line
     
     # 1440の詳細行など、強制1行モードの場合
     if force_single_line:
-        # 改行をすべてスペースに置換して1つの文字列にする
-        return [text.replace("\n", " ")]
+        # 改行をすべて削除し、スペース1つ分に置換して結合
+        joined_text = " ".join(text.splitlines())
+        return [joined_text]
 
     lines = text.splitlines()
     if not lines: return []
@@ -72,7 +73,7 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
             "right_margin": 40, "line_space": 100, "info_margin": 30, "info_line_space": 45,
             "filename_format": "com_{slug}_bn_w720h150.png", 
             "newline_mode": "first_only",
-            "force_single_line": True     # ★詳細行を必ず1行にする
+            "force_single_line": True     # ★1440だけ詳細を強制1行
         },
         "800x418": {
             "bg": "background_800.png", "sd": "shadow_800s.png",
@@ -106,16 +107,17 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
     try:
         font_n = ImageFont.truetype(FONT_PATH, conf["f_size"][0])
         font_t = ImageFont.truetype(FONT_PATH, conf["f_size"][1])
-        # 1440で詳細が長すぎる場合に備え、フォントサイズを動的に調整
+        
+        # 詳細行（日時・場所）のフォント設定
         info_font_size = conf["f_size"][2]
         if conf["force_single_line"]:
-             # 仮の描画で幅をチェックし、はみ出すならフォントを小さくする（最小25px）
+             # 強制1行の場合のみ、はみ出すならフォントを小さくする
+             info_text_single = " ".join(i_txt.splitlines())
              temp_font = ImageFont.truetype(FONT_PATH, info_font_size)
-             info_text = i_txt.replace("\n", " ")
-             while info_font_size > 25:
-                 w = draw.textbbox((0, 0), info_text, font=temp_font)[2]
+             while info_font_size > 22: # 最小サイズまで
+                 w = draw.textbbox((0, 0), info_text_single, font=temp_font)[2]
                  if w <= conf["max_w"]: break
-                 info_font_size -= 2
+                 info_font_size -= 1
                  temp_font = ImageFont.truetype(FONT_PATH, info_font_size)
         font_i = ImageFont.truetype(FONT_PATH, info_font_size)
     except:
@@ -127,10 +129,9 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
     if size_key == "1440x300":
         first_line = wrapped_title[0] if wrapped_title else ""
         draw.text((width - r_margin, conf["y_pos"][1]), first_line, fill=accent_color, font=font_t, anchor="ra")
-        
-        t_bbox = draw.textbbox((0, 0), first_line, font=font_t)
-        t_w = t_bbox[2] - t_bbox[0]
-        draw.text((width - r_margin - t_w - 30, conf["y_pos"][0]), n_txt, fill="#000000", font=font_n, anchor="ra")
+        t_w = draw.textbbox((0, 0), first_line, font=font_t)[2] - t_bbox[0] if 't_bbox' in locals() else draw.textbbox((0, 0), first_line, font=font_t)[2]
+        # 回数の位置調整
+        draw.text((width - r_margin - (draw.textbbox((0, 0), first_line, font=font_t)[2]) - 30, conf["y_pos"][0]), n_txt, fill="#000000", font=font_n, anchor="ra")
         
         curr_y = conf["y_pos"][1] + conf["line_space"]
         for line in wrapped_title[1:]:
@@ -145,6 +146,7 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
 
     # --- 2. 詳細行の描画 ---
     curr_y = curr_y - conf["line_space"] + conf["f_size"][1] + conf["info_margin"]
+    # ここで正しく関数の引数 i_txt を使い、フラグを渡します
     wrapped_info = wrap_text(i_txt, font_i, conf["max_w"], draw, newline_mode=conf["newline_mode"], force_single_line=conf["force_single_line"])
     for i_line in wrapped_info:
         draw.text((width - r_margin, curr_y), i_line, fill="#000000", font=font_i, anchor="ra")
@@ -171,6 +173,7 @@ for idx, size_key in enumerate(size_list):
     with cols[idx]:
         st.subheader(f"📏 {size_key}")
         try:
+            # UIの入力をそのまま関数に渡す
             img, name_format = generate_banner(size_key, n_in, t_in, i_in, accent_color)
             st.image(img, use_container_width=True)
             final_filename = name_format.format(slug=slug)
