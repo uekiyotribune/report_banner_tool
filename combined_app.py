@@ -14,20 +14,16 @@ SIZES = {
 }
 
 # --- 自動折り返し関数 ---
-def wrap_text(text, font, max_width, draw, newline_mode="all", force_single_line=False):
+def wrap_text(text, font, max_width, draw, newline_mode="all"):
     if not text: return []
     
-    # 1440の詳細行など、強制1行モード
-    if force_single_line:
-        # 入力の全改行を削除し、スペース1つで結合して「1つの要素」として返す
-        single_joined = " ".join(text.splitlines()).strip()
-        return [single_joined] if single_joined else []
-
     lines = text.splitlines()
     paragraphs = []
     if newline_mode == "all":
+        # 880用：ユーザーの改行をすべて維持
         paragraphs = lines
     elif newline_mode == "first_only":
+        # 800用：1行目のみ維持、以降結合
         paragraphs.append(lines[0])
         if len(lines) > 1:
             remaining = "".join(lines[1:])
@@ -61,24 +57,21 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
             "f_size": [54, 80, 40], "y_pos": [10, 80], "max_w": 740,
             "right_margin": 40, "line_space": 95, "info_margin": 30, "info_line_space": 50,
             "filename_format": "com_{slug}_thum_w440h275.png", 
-            "newline_mode": "all",
-            "force_single_line": False
+            "newline_mode": "all"
         },
         "1440x300": {
             "bg": "background_1440.png", "sd": "shadow_1440.png",
             "f_size": [54, 86, 40], "y_pos": [25, 3], "max_w": 1050,
             "right_margin": 40, "line_space": 100, "info_margin": 30, "info_line_space": 45,
             "filename_format": "com_{slug}_bn_w720h150.png", 
-            "newline_mode": "first_only",
-            "force_single_line": True     # ★1440の詳細行は強制1行
+            "newline_mode": "first_only"
         },
         "800x418": {
             "bg": "background_800.png", "sd": "shadow_800s.png",
             "f_size": [41, 60, 30], "y_pos": [25, 80], "max_w": 710,
             "right_margin": 20, "line_space": 70, "info_margin": 25, "info_line_space": 42,
             "filename_format": "X_{slug}_thum_w800h418.png", 
-            "newline_mode": "first_only",
-            "force_single_line": False
+            "newline_mode": "first_only"
         }
     }
     
@@ -102,20 +95,11 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
 
     draw = ImageDraw.Draw(final_image)
     
+    # フォント読み込み
     try:
         font_n = ImageFont.truetype(FONT_PATH, conf["f_size"][0])
         font_t = ImageFont.truetype(FONT_PATH, conf["f_size"][1])
-        # 詳細行のフォント（1440の場合は収まるまでリサイズ）
-        i_f_size = conf["f_size"][2]
-        if conf["force_single_line"]:
-            i_text_flat = " ".join(i_txt.splitlines()).strip()
-            temp_font = ImageFont.truetype(FONT_PATH, i_f_size)
-            while i_f_size > 20:
-                tw = draw.textbbox((0, 0), i_text_flat, font=temp_font)[2]
-                if tw <= conf["max_w"]: break
-                i_f_size -= 1
-                temp_font = ImageFont.truetype(FONT_PATH, i_f_size)
-        font_i = ImageFont.truetype(FONT_PATH, i_f_size)
+        font_i = ImageFont.truetype(FONT_PATH, conf["f_size"][2])
     except:
         font_n = font_t = font_i = ImageFont.load_default()
 
@@ -125,11 +109,8 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
     if size_key == "1440x300":
         first_line = wrapped_title[0] if wrapped_title else ""
         draw.text((width - r_margin, conf["y_pos"][1]), first_line, fill=accent_color, font=font_t, anchor="ra")
-        
-        # 回数の位置調整
         t_w = draw.textbbox((0, 0), first_line, font=font_t)[2]
         draw.text((width - r_margin - t_w - 30, conf["y_pos"][0]), n_txt, fill="#000000", font=font_n, anchor="ra")
-        
         curr_y = conf["y_pos"][1] + conf["line_space"]
         for line in wrapped_title[1:]:
             draw.text((width - r_margin, curr_y), line, fill=accent_color, font=font_t, anchor="ra")
@@ -141,18 +122,32 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
             draw.text((width - r_margin, curr_y), line, fill=accent_color, font=font_t, anchor="ra")
             curr_y += conf["line_space"]
 
-    # --- 2. 詳細行の描画 ---
-    # 直前の学会名末尾から位置を算出
+    # --- 2. 詳細行（場所・日時）の描画 ---
     info_y = curr_y - conf["line_space"] + conf["f_size"][1] + conf["info_margin"]
-    
-    # 1440の場合は force_single_line=True で呼び出し
-    wrapped_info = wrap_text(i_txt, font_i, conf["max_w"], draw, 
-                             newline_mode=conf["newline_mode"], 
-                             force_single_line=conf["force_single_line"])
-    
-    for i_line in wrapped_info:
-        draw.text((width - r_margin, info_y), i_line, fill="#000000", font=font_i, anchor="ra")
-        info_y += conf["info_line_space"]
+
+    if size_key == "1440x300":
+        # 【1440専用：絶対1行化ロジック】
+        # 入力の改行をすべて半角スペースに変えて1本にする
+        info_single = " ".join(i_txt.splitlines()).strip()
+        
+        # 枠に収まるまでフォントサイズを下げる
+        current_info_f_size = conf["f_size"][2]
+        temp_font_i = ImageFont.truetype(FONT_PATH, current_info_f_size)
+        while current_info_f_size > 18:
+            tw = draw.textbbox((0, 0), info_single, font=temp_font_i)[2]
+            if tw <= conf["max_w"]:
+                break
+            current_info_f_size -= 1
+            temp_font_i = ImageFont.truetype(FONT_PATH, current_info_f_size)
+        
+        # 描画
+        draw.text((width - r_margin, info_y), info_single, fill="#000000", font=temp_font_i, anchor="ra")
+    else:
+        # 880と800は通常通り
+        wrapped_info = wrap_text(i_txt, font_i, conf["max_w"], draw, newline_mode=conf["newline_mode"])
+        for i_line in wrapped_info:
+            draw.text((width - r_margin, info_y), i_line, fill="#000000", font=font_i, anchor="ra")
+            info_y += conf["info_line_space"]
 
     return final_image, conf["filename_format"]
 
@@ -170,4 +165,16 @@ with st.sidebar:
 
 st.title("🎓 学会バナー 3サイズ一括生成")
 cols = st.columns(3)
-size
+size_list = ["880x550", "1440x300", "800x418"]
+for idx, size_key in enumerate(size_list):
+    with cols[idx]:
+        st.subheader(f"📏 {size_key}")
+        try:
+            img, name_format = generate_banner(size_key, n_in, t_in, i_in, accent_color)
+            st.image(img, use_container_width=True)
+            final_filename = name_format.format(slug=slug)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            st.download_button(label=f"💾 保存: {final_filename}", data=buf.getvalue(), file_name=final_filename, key=f"btn_{size_key}")
+        except Exception as e:
+            st.error(f"実行エラー: {e}")
