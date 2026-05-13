@@ -13,21 +13,25 @@ SIZES = {
     "800x418": (800, 418)
 }
 
-# --- 自動折り返し関数（サイズ別モード対応版） ---
-def wrap_text(text, font, max_width, draw, newline_mode="all"):
+# --- 自動折り返し関数 ---
+def wrap_text(text, font, max_width, draw, newline_mode="all", force_single_line=False):
     if not text: return []
+    
+    # 1440の詳細行など、強制1行モードの場合
+    if force_single_line:
+        # 改行をすべてスペースに置換して1つの文字列にする
+        return [text.replace("\n", " ")]
+
     lines = text.splitlines()
     if not lines: return []
 
     paragraphs = []
     if newline_mode == "all":
-        # 880用：すべての改行を個別の段落として扱う
         paragraphs = lines
     elif newline_mode == "first_only":
-        # 1440/800用：1行目は独立、2行目以降はすべて結合して一つの段落にする
         paragraphs.append(lines[0])
         if len(lines) > 1:
-            remaining = "".join(lines[1:]) # スペースなしで結合
+            remaining = "".join(lines[1:])
             if remaining:
                 paragraphs.append(remaining)
     
@@ -59,21 +63,24 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
             "f_size": [54, 80, 40], "y_pos": [10, 80], "max_w": 740,
             "right_margin": 40, "line_space": 95, "info_margin": 30, "info_line_space": 50,
             "filename_format": "com_{slug}_thum_w440h275.png", 
-            "newline_mode": "all"         # 全改行厳守
+            "newline_mode": "all",
+            "force_single_line": False
         },
         "1440x300": {
             "bg": "background_1440.png", "sd": "shadow_1440.png",
             "f_size": [54, 86, 40], "y_pos": [25, 3], "max_w": 1050,
             "right_margin": 40, "line_space": 100, "info_margin": 30, "info_line_space": 45,
             "filename_format": "com_{slug}_bn_w720h150.png", 
-            "newline_mode": "first_only"  # 1行目のみ維持、以降結合
+            "newline_mode": "first_only",
+            "force_single_line": True     # ★詳細行を必ず1行にする
         },
         "800x418": {
             "bg": "background_800.png", "sd": "shadow_800s.png",
             "f_size": [41, 60, 30], "y_pos": [25, 80], "max_w": 710,
             "right_margin": 20, "line_space": 70, "info_margin": 25, "info_line_space": 42,
             "filename_format": "X_{slug}_thum_w800h418.png", 
-            "newline_mode": "first_only"  # 1行目のみ維持、以降結合
+            "newline_mode": "first_only",
+            "force_single_line": False
         }
     }
     
@@ -99,7 +106,18 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
     try:
         font_n = ImageFont.truetype(FONT_PATH, conf["f_size"][0])
         font_t = ImageFont.truetype(FONT_PATH, conf["f_size"][1])
-        font_i = ImageFont.truetype(FONT_PATH, conf["f_size"][2])
+        # 1440で詳細が長すぎる場合に備え、フォントサイズを動的に調整
+        info_font_size = conf["f_size"][2]
+        if conf["force_single_line"]:
+             # 仮の描画で幅をチェックし、はみ出すならフォントを小さくする（最小25px）
+             temp_font = ImageFont.truetype(FONT_PATH, info_font_size)
+             info_text = i_txt.replace("\n", " ")
+             while info_font_size > 25:
+                 w = draw.textbbox((0, 0), info_text, font=temp_font)[2]
+                 if w <= conf["max_w"]: break
+                 info_font_size -= 2
+                 temp_font = ImageFont.truetype(FONT_PATH, info_font_size)
+        font_i = ImageFont.truetype(FONT_PATH, info_font_size)
     except:
         font_n = font_t = font_i = ImageFont.load_default()
 
@@ -126,9 +144,8 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
             curr_y += conf["line_space"]
 
     # --- 2. 詳細行の描画 ---
-    # ここを修正：i_in ではなく関数の引数 i_txt を使い、newline_mode を適用
     curr_y = curr_y - conf["line_space"] + conf["f_size"][1] + conf["info_margin"]
-    wrapped_info = wrap_text(i_txt, font_i, conf["max_w"], draw, newline_mode=conf["newline_mode"])
+    wrapped_info = wrap_text(i_txt, font_i, conf["max_w"], draw, newline_mode=conf["newline_mode"], force_single_line=conf["force_single_line"])
     for i_line in wrapped_info:
         draw.text((width - r_margin, curr_y), i_line, fill="#000000", font=font_i, anchor="ra")
         curr_y += conf["info_line_space"]
