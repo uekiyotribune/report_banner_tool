@@ -89,9 +89,9 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
     try:
         font_n = ImageFont.truetype(FONT_PATH, conf["f_size"][0])
         font_t = ImageFont.truetype(FONT_PATH, conf["f_size"][1])
-        font_i = ImageFont.truetype(FONT_PATH, conf["f_size"][2])
+        font_i_base = ImageFont.truetype(FONT_PATH, conf["f_size"][2])
     except:
-        font_n = font_t = font_i = ImageFont.load_default()
+        font_n = font_t = font_i_base = ImageFont.load_default()
 
     # --- 1. 学会名の描画 ---
     wrapped_title = wrap_text(t_txt, font_t, conf["max_w"], draw, newline_mode=conf["newline_mode"])
@@ -116,28 +116,25 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
     info_y_pos = curr_y - conf["line_space"] + conf["f_size"][1] + conf["info_margin"]
 
     if size_key == "1440x300":
-        # 【1440サイズ特別処理：絶対1行化】
-        # 1. 改行をすべて削除し、半角スペース1つに置換
+        # 改行をすべて削除しスペース1つに置換（何があっても1行にする）
         info_cleaned = " ".join(i_txt.splitlines()).strip()
         
-        # 2. 枠（max_w）に収まるまでフォントサイズを強制的に下げる
-        info_f_size = conf["f_size"][2]
-        temp_info_font = ImageFont.truetype(FONT_PATH, info_f_size)
-        while info_f_size > 12:
-            w = draw.textbbox((0, 0), info_cleaned, font=temp_info_font)[2]
+        # 枠に収まるまでフォントサイズを下げる
+        current_f_size = conf["f_size"][2]
+        temp_font = ImageFont.truetype(FONT_PATH, current_f_size)
+        while current_f_size > 12:
+            w = draw.textbbox((0, 0), info_cleaned, font=temp_font)[2]
             if w <= conf["max_w"]:
                 break
-            info_f_size -= 1
-            temp_info_font = ImageFont.truetype(FONT_PATH, info_f_size)
+            current_f_size -= 1
+            temp_font = ImageFont.truetype(FONT_PATH, current_f_size)
         
-        # 3. リスト化せず直接1つの文字列として描画
-        draw.text((width - r_margin, info_y_pos), info_cleaned, fill="#000000", font=temp_info_font, anchor="ra")
+        draw.text((width - r_margin, info_y_pos), info_cleaned, fill="#000000", font=temp_font, anchor="ra")
     else:
-        # 880と800は通常通り（newline_modeに従い、入りきらない場合は自動改行も行う）
-        wrapped_info = wrap_text(i_txt, font_i, conf["max_w"], draw, newline_mode=conf["newline_mode"])
+        wrapped_info = wrap_text(i_txt, font_i_base, conf["max_w"], draw, newline_mode=conf["newline_mode"])
         temp_y = info_y_pos
         for i_line in wrapped_info:
-            draw.text((width - r_margin, temp_y), i_line, fill="#000000", font=font_i, anchor="ra")
+            draw.text((width - r_margin, temp_y), i_line, fill="#000000", font=font_i_base, anchor="ra")
             temp_y += conf["info_line_space"]
 
     return final_image, conf["filename_format"]
