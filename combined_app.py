@@ -13,20 +13,24 @@ SIZES = {
     "800x418": (800, 418)
 }
 
-# --- 自動折り返し関数（シンプル版に戻しました） ---
+# --- 自動折り返し関数（サイズ別モード対応版に修正） ---
 def wrap_text(text, font, max_width, draw, newline_mode="all"):
     if not text: return []
     lines = text.splitlines()
     if not lines: return []
 
+    # 段落（パラグラフ）の構成をモード別に切り替え
     paragraphs = []
     if newline_mode == "all":
+        # 880用：すべての改行を個別の段落として扱う
         paragraphs = lines
     elif newline_mode == "first_only":
+        # 1440/800用：1行目は独立、2行目以降はすべて結合して一つの段落にする
         paragraphs.append(lines[0])
         if len(lines) > 1:
-            remaining = "".join(lines[1:])
-            if remaining: paragraphs.append(remaining)
+            remaining = "".join(lines[1:]) # スペースなしで結合
+            if remaining:
+                paragraphs.append(remaining)
     
     final_lines = []
     for p in paragraphs:
@@ -36,7 +40,6 @@ def wrap_text(text, font, max_width, draw, newline_mode="all"):
         line = ""
         for char in p:
             test_line = line + char
-            # 標準的な幅計算
             bbox = draw.textbbox((0, 0), test_line, font=font)
             w = bbox[2] - bbox[0]
             if w <= max_width:
@@ -56,19 +59,22 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
             "bg": "background_880.png", "sd": "shadow_880.png",
             "f_size": [54, 80, 40], "y_pos": [10, 80], "max_w": 740,
             "right_margin": 40, "line_space": 95, "info_margin": 30, "info_line_space": 50,
-            "filename_format": "com_{slug}_thum_w440h275.png", "newline_mode": "all"
+            "filename_format": "com_{slug}_thum_w440h275.png", 
+            "newline_mode": "all"         # 全改行厳守
         },
         "1440x300": {
             "bg": "background_1440.png", "sd": "shadow_1440.png",
             "f_size": [54, 86, 40], "y_pos": [25, 3], "max_w": 1050,
             "right_margin": 40, "line_space": 100, "info_margin": 30, "info_line_space": 45,
-            "filename_format": "com_{slug}_bn_w720h150.png", "newline_mode": "first_only"
+            "filename_format": "com_{slug}_bn_w720h150.png", 
+            "newline_mode": "first_only"  # 1行目のみ維持、以降結合
         },
         "800x418": {
             "bg": "background_800.png", "sd": "shadow_800s.png",
             "f_size": [41, 60, 30], "y_pos": [25, 80], "max_w": 710,
             "right_margin": 20, "line_space": 70, "info_margin": 25, "info_line_space": 42,
-            "filename_format": "X_{slug}_thum_w800h418.png", "newline_mode": "first_only"
+            "filename_format": "X_{slug}_thum_w800h418.png", 
+            "newline_mode": "first_only"  # 1行目のみ維持、以降結合
         }
     }
     
@@ -98,7 +104,7 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
     except:
         font_n = font_t = font_i = ImageFont.load_default()
 
-    # --- 学会名の描画（標準の右寄せ描画に戻しました） ---
+    # --- 学会名の描画 ---
     wrapped_title = wrap_text(t_txt, font_t, conf["max_w"], draw, newline_mode=conf["newline_mode"])
     
     if size_key == "1440x300":
