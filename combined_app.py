@@ -13,13 +13,12 @@ SIZES = {
     "800x418": (800, 418)
 }
 
-# --- 自動折り返し関数（サイズ別モード対応版に修正） ---
+# --- 自動折り返し関数（サイズ別モード対応版） ---
 def wrap_text(text, font, max_width, draw, newline_mode="all"):
     if not text: return []
     lines = text.splitlines()
     if not lines: return []
 
-    # 段落（パラグラフ）の構成をモード別に切り替え
     paragraphs = []
     if newline_mode == "all":
         # 880用：すべての改行を個別の段落として扱う
@@ -104,7 +103,7 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
     except:
         font_n = font_t = font_i = ImageFont.load_default()
 
-    # --- 学会名の描画 ---
+    # --- 1. 学会名の描画 ---
     wrapped_title = wrap_text(t_txt, font_t, conf["max_w"], draw, newline_mode=conf["newline_mode"])
     
     if size_key == "1440x300":
@@ -126,9 +125,10 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
             draw.text((width - r_margin, curr_y), line, fill=accent_color, font=font_t, anchor="ra")
             curr_y += conf["line_space"]
 
-    # --- 詳細行の描画 ---
+    # --- 2. 詳細行の描画 ---
+    # ここを修正：i_in ではなく関数の引数 i_txt を使い、newline_mode を適用
     curr_y = curr_y - conf["line_space"] + conf["f_size"][1] + conf["info_margin"]
-    wrapped_info = wrap_text(i_in, font_i, conf["max_w"], draw, newline_mode=conf["newline_mode"])
+    wrapped_info = wrap_text(i_txt, font_i, conf["max_w"], draw, newline_mode=conf["newline_mode"])
     for i_line in wrapped_info:
         draw.text((width - r_margin, curr_y), i_line, fill="#000000", font=font_i, anchor="ra")
         curr_y += conf["info_line_space"]
