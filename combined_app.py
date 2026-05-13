@@ -113,39 +113,16 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
             curr_y += conf["line_space"]
 
     # --- 2. 開催場所・日時の描画 ---
-    # 直前の学会名ブロックの最終y位置からマージンを足す
-    info_y_start = curr_y - conf["line_space"] + conf["f_size"][1] + conf["info_margin"]
+    info_y_pos = curr_y - conf["line_space"] + conf["f_size"][1] + conf["info_margin"]
 
     if size_key == "1440x300":
-        # 1440専用：入力が複数行でも強制的にスペース結合して1行にする
-        info_single_line = " ".join(i_txt.splitlines()).strip()
+        # 【1440サイズ特別処理：絶対1行化】
+        # 1. 改行をすべて削除し、半角スペース1つに置換
+        info_cleaned = " ".join(i_txt.splitlines()).strip()
         
-        # 枠に収まるまでフォントサイズを自動調整
-        current_f_size_i = conf["f_size"][2]
-        temp_font_i = ImageFont.truetype(FONT_PATH, current_f_size_i)
-        while current_f_size_i > 15:
-            text_width = draw.textbbox((0, 0), info_single_line, font=temp_font_i)[2]
-            if text_width <= conf["max_w"]:
-                break
-            current_f_size_i -= 1
-            temp_font_i = ImageFont.truetype(FONT_PATH, current_f_size_i)
-        
-        draw.text((width - r_margin, info_y_start), info_single_line, fill="#000000", font=temp_font_i, anchor="ra")
-    else:
-        # 880と800は通常通り（newline_modeに従う）
-        wrapped_info = wrap_text(i_txt, font_i, conf["max_w"], draw, newline_mode=conf["newline_mode"])
-        temp_y = info_y_start
-        for i_line in wrapped_info:
-            draw.text((width - r_margin, temp_y), i_line, fill="#000000", font=font_i, anchor="ra")
-            temp_y += conf["info_line_space"]
-
-    return final_image, conf["filename_format"]
-
-# --- UI ---
-st.set_page_config(page_title="学会バナー一括生成", layout="wide")
-with st.sidebar:
-    st.header("🎨 デザイン設定")
-    accent_color = st.color_picker("テーマカラー", "#1A448E")
-    n_in = st.text_input("回数", "第○○回")
-    t_in = st.text_area("学会名", "日本○○○○学会")
-    i_in = st.text_area("詳細 (日時・場所)", "東京・ウェブ併催／202
+        # 2. 枠（max_w）に収まるまでフォントサイズを強制的に下げる
+        info_f_size = conf["f_size"][2]
+        temp_info_font = ImageFont.truetype(FONT_PATH, info_f_size)
+        while info_f_size > 12:
+            w = draw.textbbox((0, 0), info_cleaned, font=temp_info_font)[2]
+            if w <= conf
