@@ -23,8 +23,8 @@ def wrap_text(text, font, max_width, draw, newline_mode="all"):
     text_w = bbox[2] - bbox[0]
     
     # モードに応じた判定
-    # newline_mode == "none": 強制1行
-    # newline_mode == "auto_single": 幅に収まるなら1行
+    # 1440用 (none): 強制1行
+    # 800用 (auto_single): 幅に収まるなら1行
     if newline_mode == "none" or (newline_mode == "auto_single" and text_w <= max_width):
         return [single_line_text]
 
@@ -60,10 +60,18 @@ def wrap_text(text, font, max_width, draw, newline_mode="all"):
 # --- 画像生成メイン ---
 def create_banner(size_key, n_txt, t_txt, i_txt, color):
     width, height = SIZES[size_key]
-    final_image = Image.new("RGB", (width, height), "#FFFFFF")
+    
+    # --- 背景画像の読み込みを復元 ---
+    bg_path = os.path.join(BASE_DIR, f"bg_{size_key}.png")
+    if os.path.exists(bg_path):
+        final_image = Image.open(bg_path).convert("RGB")
+    else:
+        # 画像がない場合の予備（白背景）
+        final_image = Image.new("RGB", (width, height), "#FFFFFF")
+    
     draw = ImageDraw.Draw(final_image)
     
-    # 各サイズごとの詳細設定
+    # 各サイズごとの詳細設定（ご提示の最終版の数値を維持）
     configs = {
         "880x550": {
             "n_fs": 40, "t_fs": 58, "i_fs": 34,
@@ -96,7 +104,7 @@ def create_banner(size_key, n_txt, t_txt, i_txt, color):
         st.error("フォントファイルが見つかりません。")
         return None, ""
 
-    # デザイン描画（アクセントバー）
+    # アクセントバー（最上部の細い線）
     draw.rectangle([0, 0, width, 15], fill=color)
     
     r_margin = 50
@@ -111,13 +119,14 @@ def create_banner(size_key, n_txt, t_txt, i_txt, color):
         title_y_pos += conf["t_fs"] + conf["line_space"]
 
     # 詳細 (日時・場所)
-    info_newline_mode = "all"
+    # 800サイズでも余裕があれば1行にする設定
+    info_nl_mode = "all"
     if size_key == "1440x300":
-        info_newline_mode = "none"
+        info_nl_mode = "none"
     elif size_key == "800x418":
-        info_newline_mode = "auto_single"
+        info_nl_mode = "auto_single"
 
-    wrapped_info = wrap_text(i_txt, font_i_base, conf["max_w"], draw, newline_mode=info_newline_mode)
+    wrapped_info = wrap_text(i_txt, font_i_base, conf["max_w"], draw, newline_mode=info_nl_mode)
     info_y_pos = conf["i_y"]
     for i_line in wrapped_info:
         draw.text((width - r_margin, info_y_pos), i_line, fill="#000000", font=font_i_base, anchor="ra")
