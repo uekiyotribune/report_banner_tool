@@ -1,168 +1,92 @@
 import streamlit as st
-from PIL import Image, ImageDraw, ImageFont, ImageChops
+from PIL import Image, ImageDraw, ImageFont
 import io
-import os
 
-# --- 共通設定 ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FONT_PATH = os.path.join(BASE_DIR, "NotoSansJP-Bold.ttf")
+def generate_banner():
+    st.set_page_config(page_title="Medical Banner Generator", layout="wide")
+    st.title("Medical Banner Generator")
 
-SIZES = {
-    "880x550": (880, 550),
-    "1440x300": (1440, 300),
-    "800x418": (800, 418)
-}
-
-# --- 自動折り返し関数 ---
-def wrap_text(text, font, max_width, draw, newline_mode="all"):
-    if not text: return []
-    lines = text.splitlines()
-    paragraphs = []
-    if newline_mode == "all":
-        paragraphs = lines
-    elif newline_mode == "first_only":
-        paragraphs.append(lines[0])
-        if len(lines) > 1:
-            remaining = "".join(lines[1:])
-            if remaining: paragraphs.append(remaining)
+    # サイドバーでの入力
+    st.sidebar.header("入力設定")
+    title = st.sidebar.text_area("学会名 / タイトル", "第1回 メディカルトリビューン学会\n〜最新の医療技術〜")
+    details = st.sidebar.text_area("詳細（日時・場所）", "2026年5月14日（木） 19:00〜20:30\nZoomウェビナー配信")
     
-    final_lines = []
-    for p in paragraphs:
-        if not p:
-            final_lines.append("")
-            continue
-        line = ""
-        for char in p:
-            test_line = line + char
-            bbox = draw.textbbox((0, 0), test_line, font=font)
-            w = bbox[2] - bbox[0]
-            if w <= max_width:
-                line = test_line
-            else:
-                if line: final_lines.append(line)
-                line = char
-        if line: final_lines.append(line)
-    return final_lines
-
-def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
-    width, height = SIZES[size_key]
+    # フォントと背景の設定
+    font_path = "NotoSansJP-Bold.ttf"
     
-    configs = {
-        "880x550": {
-            "bg": "background_880.png", "sd": "shadow_880.png",
-            "f_size": [54, 80, 40], "y_pos": [10, 80], "max_w": 740,
-            "right_margin": 40, "line_space": 95, "info_margin": 30, "info_line_space": 50,
-            "filename_format": "com_{slug}_thum_w440h275.png", "newline_mode": "all"
-        },
-        "1440x300": {
-            "bg": "background_1440.png", "sd": "shadow_1440.png",
-            "f_size": [54, 86, 40], "y_pos": [25, 3], "max_w": 1050,
-            "right_margin": 40, "line_space": 100, "info_margin": 30, "info_line_space": 45,
-            "filename_format": "com_{slug}_bn_w720h150.png", "newline_mode": "first_only"
-        },
-        "800x418": {
-            "bg": "background_800.png", "sd": "shadow_800s.png",
-            "f_size": [41, 60, 30], "y_pos": [25, 80], "max_w": 710,
-            "right_margin": 20, "line_space": 70, "info_margin": 25, "info_line_space": 42,
-            "filename_format": "X_{slug}_thum_w800h418.png", "newline_mode": "first_only"
-        }
+    # サイズ定義
+    sizes = {
+        "1440x300": {"size": (1440, 300), "bg": "background_1440.png", "title_size": 52, "detail_size": 32},
+        "880x820": {"size": (880, 820), "bg": "background_880.png", "title_size": 60, "detail_size": 36},
+        "800x500": {"size": (800, 500), "bg": "background_800.png", "title_size": 48, "detail_size": 28}
     }
-    
-    conf = configs[size_key]
-    r_margin = conf["right_margin"]
-    final_image = Image.new('RGB', (width, height), color=accent_color)
-    
-    for path_key, filename in [("sd", conf["sd"]), ("bg", conf["bg"])]:
-        full_path = os.path.join(BASE_DIR, filename)
-        if os.path.exists(full_path):
-            overlay = Image.open(full_path).convert("RGBA").resize((width, height))
-            if path_key == "sd":
-                base = Image.new('RGBA', (width, height), color="#FFFFFF")
-                base.paste(overlay, (0, 0), overlay)
-                final_image = ImageChops.multiply(final_image, base.convert("RGB"))
-            else:
-                base = Image.new('RGBA', (width, height), color="#FFFFFF")
-                base.paste(overlay, (0, 0), overlay)
-                final_image.paste(base.convert("RGB"), (0, 0), overlay)
 
-    draw = ImageDraw.Draw(final_image)
-    try:
-        font_n = ImageFont.truetype(FONT_PATH, conf["f_size"][0])
-        font_t = ImageFont.truetype(FONT_PATH, conf["f_size"][1])
-        font_i_base = ImageFont.truetype(FONT_PATH, conf["f_size"][2])
-    except:
-        font_n = font_t = font_i_base = ImageFont.load_default()
-
-    # --- 1. 学会名の描画 ---
-    wrapped_title = wrap_text(t_txt, font_t, conf["max_w"], draw, newline_mode=conf["newline_mode"])
-    
-    if size_key == "1440x300":
-        first_line = wrapped_title[0] if wrapped_title else ""
-        draw.text((width - r_margin, conf["y_pos"][1]), first_line, fill=accent_color, font=font_t, anchor="ra")
-        t_w = draw.textbbox((0, 0), first_line, font=font_t)[2] - draw.textbbox((0, 0), first_line, font=font_t)[0]
-        draw.text((width - r_margin - t_w - 30, conf["y_pos"][0]), n_txt, fill="#000000", font=font_n, anchor="ra")
-        curr_y = conf["y_pos"][1] + conf["line_space"]
-        for line in wrapped_title[1:]:
-            draw.text((width - r_margin, curr_y), line, fill=accent_color, font=font_t, anchor="ra")
-            curr_y += conf["line_space"]
-    else:
-        draw.text((width - r_margin, conf["y_pos"][0]), n_txt, fill="#000000", font=font_n, anchor="ra")
-        curr_y = conf["y_pos"][1]
-        for line in wrapped_title:
-            draw.text((width - r_margin, curr_y), line, fill=accent_color, font=font_t, anchor="ra")
-            curr_y += conf["line_space"]
-
-    # --- 2. 開催場所・日時の描画 ---
-    info_y_pos = curr_y - conf["line_space"] + conf["f_size"][1] + conf["info_margin"]
-
-    if size_key == "1440x300":
-        # 改行をすべて削除しスペース1つに置換（何があっても1行にする）
-        info_cleaned = " ".join(i_txt.splitlines()).strip()
+    for size_key, config in sizes.items():
+        st.write("---")
+        st.subheader(f"サイズ: {size_key}")
         
-        # 枠に収まるまでフォントサイズを下げる
-        current_f_size = conf["f_size"][2]
-        temp_font = ImageFont.truetype(FONT_PATH, current_f_size)
-        while current_f_size > 12:
-            w = draw.textbbox((0, 0), info_cleaned, font=temp_font)[2]
-            if w <= conf["max_w"]:
-                break
-            current_f_size -= 1
-            temp_font = ImageFont.truetype(FONT_PATH, current_f_size)
-        
-        draw.text((width - r_margin, info_y_pos), info_cleaned, fill="#000000", font=temp_font, anchor="ra")
-    else:
-        wrapped_info = wrap_text(i_txt, font_i_base, conf["max_w"], draw, newline_mode=conf["newline_mode"])
-        temp_y = info_y_pos
-        for i_line in wrapped_info:
-            draw.text((width - r_margin, temp_y), i_line, fill="#000000", font=font_i_base, anchor="ra")
-            temp_y += conf["info_line_space"]
-
-    return final_image, conf["filename_format"]
-
-# --- UI ---
-st.set_page_config(page_title="学会バナー一括生成", layout="wide")
-with st.sidebar:
-    st.header("🎨 デザイン設定")
-    accent_color = st.color_picker("テーマカラー", "#1A448E")
-    n_in = st.text_input("回数", "第○○回")
-    t_in = st.text_area("学会名", "日本○○○○学会")
-    i_in = st.text_area("詳細 (日時・場所)", "東京・ウェブ併催／2026.1.30〜2.10")
-    st.divider()
-    slug_input = st.text_input("英語ファイル名用キーワード", "jsm").lower().strip()
-    slug = slug_input.replace(" ", "_")
-
-st.title("🎓 学会バナー 3サイズ一括生成")
-cols = st.columns(3)
-size_list = ["880x550", "1440x300", "800x418"]
-for idx, size_key in enumerate(size_list):
-    with cols[idx]:
-        st.subheader(f"📏 {size_key}")
+        # 背景の読み込み
         try:
-            img, name_format = generate_banner(size_key, n_in, t_in, i_in, accent_color)
-            st.image(img, use_container_width=True)
-            final_filename = name_format.format(slug=slug)
-            buf = io.BytesIO()
-            img.save(buf, format="PNG")
-            st.download_button(label=f"💾 保存: {final_filename}", data=buf.getvalue(), file_name=final_filename, key=f"btn_{size_key}")
-        except Exception as e:
-            st.error(f"実行エラー: {e}")
+            img = Image.open(config["bg"]).convert("RGBA")
+        except:
+            img = Image.new('RGBA', config["size"], color=(240, 240, 240, 255))
+        
+        draw = ImageDraw.Draw(img)
+        
+        # フォント設定
+        try:
+            font_title = ImageFont.truetype(font_path, config["title_size"])
+            font_details = ImageFont.truetype(font_path, config["detail_size"])
+        except:
+            st.error(f"{size_key}: フォントファイルが見つかりません。")
+            continue
+
+        # --- 学会名（タイトル）のロジック ---
+        display_title = title
+        if size_key == "1440x300":
+            # 1440は常に1行
+            display_title = title.replace("\n", " ")
+        elif size_key == "800x500":
+            # 800は「1行にした時の幅」をチェック
+            single_line_title = title.replace("\n", " ")
+            title_width = draw.textlength(single_line_title, font=font_title)
+            # 左右余白を考慮して収まるなら1行、収まらないなら改行指示に従う
+            if title_width < (config["size"][0] - 100):
+                display_title = single_line_title
+            else:
+                display_title = title
+        elif size_key == "880x820":
+            # 880は改行指示を尊重
+            display_title = title
+
+        # --- 詳細（日時・場所）のロジック ---
+        display_details = details
+        if size_key == "1440x300":
+            # 1440サイズのみ、詳細は常に1行
+            display_details = details.replace("\n", " ")
+        else:
+            # 880と800は改行指示を尊重
+            display_details = details
+
+        # 描画位置の計算（簡易中央揃え）
+        # ここでは固定位置または計算ロジックを入れます
+        w, h = config["size"]
+        draw.text((w/2, h/2 - 20), display_title, font=font_title, fill=(0, 0, 0), anchor="mm")
+        draw.text((w/2, h/2 + 60), display_details, font=font_details, fill=(50, 50, 50), anchor="mm")
+
+        # 表示
+        st.image(img, caption=f"Preview: {size_key}")
+        
+        # ダウンロードボタン
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        st.download_button(
+            label=f"{size_key}をダウンロード",
+            data=buf.getvalue(),
+            file_name=f"banner_{size_key}.png",
+            mime="image/png",
+            key=f"btn_{size_key}"
+        )
+
+if __name__ == "__main__":
+    generate_banner()
