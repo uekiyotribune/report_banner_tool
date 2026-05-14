@@ -72,6 +72,7 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
     r_margin = conf["right_margin"]
     final_image = Image.new('RGB', (width, height), color=accent_color)
     
+    # 背景とシャドウの合成
     for path_key, filename in [("sd", conf["sd"]), ("bg", conf["bg"])]:
         full_path = os.path.join(BASE_DIR, filename)
         if os.path.exists(full_path):
@@ -93,13 +94,24 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
     except:
         font_n = font_t = font_i_base = ImageFont.load_default()
 
-    # --- 1. 学会名の描画 ---
-    wrapped_title = wrap_text(t_txt, font_t, conf["max_w"], draw, newline_mode=conf["newline_mode"])
+    # --- 1. 学会名の描画判定 ---
+    if size_key == "800x418":
+        # 1行にまとめた場合の幅をテスト
+        t_cleaned = " ".join(t_txt.splitlines()).strip()
+        t_w = draw.textbbox((0, 0), t_cleaned, font=font_t)[2]
+        if t_w <= conf["max_w"]:
+            wrapped_title = [t_cleaned]
+        else:
+            wrapped_title = wrap_text(t_txt, font_t, conf["max_w"], draw, newline_mode=conf["newline_mode"])
+    else:
+        wrapped_title = wrap_text(t_txt, font_t, conf["max_w"], draw, newline_mode=conf["newline_mode"])
     
+    # 学会名の描画実行
     if size_key == "1440x300":
         first_line = wrapped_title[0] if wrapped_title else ""
         draw.text((width - r_margin, conf["y_pos"][1]), first_line, fill=accent_color, font=font_t, anchor="ra")
-        t_w = draw.textbbox((0, 0), first_line, font=font_t)[2] - draw.textbbox((0, 0), first_line, font=font_t)[0]
+        t_bbox = draw.textbbox((0, 0), first_line, font=font_t)
+        t_w = t_bbox[2] - t_bbox[0]
         draw.text((width - r_margin - t_w - 30, conf["y_pos"][0]), n_txt, fill="#000000", font=font_n, anchor="ra")
         curr_y = conf["y_pos"][1] + conf["line_space"]
         for line in wrapped_title[1:]:
@@ -112,14 +124,12 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
             draw.text((width - r_margin, curr_y), line, fill=accent_color, font=font_t, anchor="ra")
             curr_y += conf["line_space"]
 
-    # --- 2. 開催場所・日時の描画 ---
+    # --- 2. 開催場所・日時の描画判定 ---
     info_y_pos = curr_y - conf["line_space"] + conf["f_size"][1] + conf["info_margin"]
 
     if size_key == "1440x300":
-        # 改行をすべて削除しスペース1つに置換（何があっても1行にする）
+        # 1440は常に1行に圧縮
         info_cleaned = " ".join(i_txt.splitlines()).strip()
-        
-        # 枠に収まるまでフォントサイズを下げる
         current_f_size = conf["f_size"][2]
         temp_font = ImageFont.truetype(FONT_PATH, current_f_size)
         while current_f_size > 12:
@@ -128,10 +138,20 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
                 break
             current_f_size -= 1
             temp_font = ImageFont.truetype(FONT_PATH, current_f_size)
-        
         draw.text((width - r_margin, info_y_pos), info_cleaned, fill="#000000", font=temp_font, anchor="ra")
     else:
-        wrapped_info = wrap_text(i_txt, font_i_base, conf["max_w"], draw, newline_mode=conf["newline_mode"])
+        # 800x418 の場合のみ「余裕があれば1行」チェック
+        if size_key == "800x418":
+            i_cleaned = " ".join(i_txt.splitlines()).strip()
+            i_w = draw.textbbox((0, 0), i_cleaned, font=font_i_base)[2]
+            if i_w <= conf["max_w"]:
+                wrapped_info = [i_cleaned]
+            else:
+                wrapped_info = wrap_text(i_txt, font_i_base, conf["max_w"], draw, newline_mode=conf["newline_mode"])
+        else:
+            # 880サイズは指示通りの改行を維持
+            wrapped_info = wrap_text(i_txt, font_i_base, conf["max_w"], draw, newline_mode=conf["newline_mode"])
+        
         temp_y = info_y_pos
         for i_line in wrapped_info:
             draw.text((width - r_margin, temp_y), i_line, fill="#000000", font=font_i_base, anchor="ra")
