@@ -95,9 +95,10 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
         font_n = font_t = font_i_base = ImageFont.load_default()
 
     # --- 1. 学会名の描画判定 ---
-    if size_key == "800x418":
-        # 1行にまとめた場合の幅をテスト
-        t_cleaned = " ".join(t_txt.splitlines()).strip()
+    # 800サイズと1440サイズで「余裕があれば1行」チェック
+    if size_key in ["800x418", "1440x300"]:
+        # 改行を削除して直結（スペースなし）
+        t_cleaned = "".join(t_txt.splitlines()).strip()
         t_w = draw.textbbox((0, 0), t_cleaned, font=font_t)[2]
         if t_w <= conf["max_w"]:
             wrapped_title = [t_cleaned]
@@ -128,8 +129,8 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
     info_y_pos = curr_y - conf["line_space"] + conf["f_size"][1] + conf["info_margin"]
 
     if size_key == "1440x300":
-        # 1440は常に1行に圧縮
-        info_cleaned = " ".join(i_txt.splitlines()).strip()
+        # 1440は常に1行に圧縮（スペースなし）
+        info_cleaned = "".join(i_txt.splitlines()).strip()
         current_f_size = conf["f_size"][2]
         temp_font = ImageFont.truetype(FONT_PATH, current_f_size)
         while current_f_size > 12:
@@ -140,9 +141,9 @@ def generate_banner(size_key, n_txt, t_txt, i_txt, accent_color):
             temp_font = ImageFont.truetype(FONT_PATH, current_f_size)
         draw.text((width - r_margin, info_y_pos), info_cleaned, fill="#000000", font=temp_font, anchor="ra")
     else:
-        # 800x418 の場合のみ「余裕があれば1行」チェック
+        # 800x418 の場合のみ「余裕があれば1行（スペースなし）」チェック
         if size_key == "800x418":
-            i_cleaned = " ".join(i_txt.splitlines()).strip()
+            i_cleaned = "".join(i_txt.splitlines()).strip()
             i_w = draw.textbbox((0, 0), i_cleaned, font=font_i_base)[2]
             if i_w <= conf["max_w"]:
                 wrapped_info = [i_cleaned]
